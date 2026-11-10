@@ -46,3 +46,16 @@ GLTools Reborn, se aplican a cualquier proyecto presente o futuro.
 > la altura: **se copia la estructura** de una app que sí funciona y **se refina** —arreglando
 > sus errores, quitando lo que sobra, fusionando funciones—. Nunca se justifica con «es que es
 > lo que hay».
+
+## Reglas de operación y procedimientos
+
+- **[REGLAS-OBLIGATORIAS.md](REGLAS-OBLIGATORIAS.md)** — las nueve reglas de cómo se trabaja:
+  limpiar en cada turno, subir la versión en los tres sitios, publicar y verificar en el mismo
+  turno, una incidencia por pendiente, ninguna afirmación sin prueba.
+- **[procedimientos/](procedimientos/)** — los cinco scripts que hacen todo eso, ejecutables:
+  1. `01-censar-catalogo-appteka.py` — censar las 42 categorías de Appteka con el filtro de
+     código abierto (**36.540 apps**, ejecutado y verificado).
+  2. `02-elegir-y-desmontar.sh` — bajar y desmontar las apps de las que aprender.
+  3. `03-cerrar-tramo.sh` — probar, firmar, publicar, verificar y limpiar, en ese orden.
+  4. `04-incidencias.sh` — abrir una incidencia por cada pendiente, sin duplicarlas.
+  5. `05-diseno-imitar-y-mejorar.md` — de una pantalla fea a una que no lo es, fase por fase.
