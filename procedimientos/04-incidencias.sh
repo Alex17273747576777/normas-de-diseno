@@ -1,57 +1,99 @@
-#!/bin/bash
-# Abrir una incidencia por cada cosa pendiente, en el repositorio que le corresponde.
-#
-# Por qué existe: lo pendiente que vive en un chat se pierde. Lo que vive en la lista de
-# incidencias del repositorio se ve, se puede cerrar y no se olvida. El aviso del 22 % de
-# batería o del `LazyColumn` anidado tenía que haber sido una incidencia antes de ser un fallo.
-#
-# Uso:  ./04-incidencias.sh            (lee incidencias.txt del directorio actual)
-#
-# Formato de incidencias.txt — una por bloque, separadas por una línea `---`:
-#
-#   repo: Alex17273747576777/gltools-reborn
-#   titulo: La Home no tiene transición entre pestañas
-#   etiquetas: diseno, pendiente
-#   cuerpo: |
-#     Texto largo, con lo que hace falta para reproducirlo o comprobarlo.
-#   ---
+#!/usr/bin/env bash
+# Crear incidencias por API sin temporales ni interpolación de títulos en código.
 set -euo pipefail
-TOKEN="$(head -1 "$HOME/.gh-tokens")"
-FICHERO="${1:-incidencias.txt}"
-[ -f "$FICHERO" ] || { echo "falta $FICHERO"; exit 1; }
+exec python3 - "$@" <<'PY'
+import json
+import os
+import pathlib
+import re
+import sys
+import urllib.error
+import urllib.request
 
-# Partir el fichero en bloques
-awk 'BEGIN{RS="\n---\n"} {print > ("/tmp/inc-" NR ".txt")}' "$FICHERO"
-abiertas=0
-for bloque in /tmp/inc-*.txt; do
-  repo=$(grep -m1 '^repo:' "$bloque" | sed 's/^repo:[[:space:]]*//')
-  titulo=$(grep -m1 '^titulo:' "$bloque" | sed 's/^titulo:[[:space:]]*//')
-  etiquetas=$(grep -m1 '^etiquetas:' "$bloque" | sed 's/^etiquetas:[[:space:]]*//')
-  [ -z "$repo" ] || [ -z "$titulo" ] && { rm -f "$bloque"; continue; }
-  # cuerpo: todo lo que va después de `cuerpo: |`, sin el margen de indentación
-  cuerpo=$(awk '/^cuerpo: \|/{f=1;next} f{sub(/^  /,"");print}' "$bloque")
-  # no duplicar: si ya hay una abierta con el mismo título, se salta
-  ya=$(curl -s -H "Authorization: Bearer $TOKEN" \
-    "https://api.github.com/repos/$repo/issues?state=open&per_page=100" \
-    | python3 -c "import json,sys;print(sum(1 for i in json.load(sys.stdin) if i['title']=='''$titulo'''))" 2>/dev/null || echo 0)
-  if [ "${ya:-0}" != "0" ]; then echo "  = ya existe: $titulo"; rm -f "$bloque"; continue; fi
-  python3 - "$TOKEN" "$repo" "$titulo" "$cuerpo" "$etiquetas" <<'PY'
-import json, sys, urllib.request, urllib.error
-tok, repo, titulo, cuerpo, etiquetas = sys.argv[1:6]
-et = [e.strip() for e in etiquetas.split(",") if e.strip()]
-def post(datos):
-    r = urllib.request.Request(f"https://api.github.com/repos/{repo}/issues",
-        data=json.dumps(datos).encode(), method="POST",
-        headers={"Authorization": "Bearer " + tok, "Accept": "application/vnd.github+json", "User-Agent": "inc"})
-    return json.load(urllib.request.urlopen(r))
-try:
-    i = post({"title": titulo, "body": cuerpo, "labels": et})
-except urllib.error.HTTPError:
-    # las etiquetas pueden no existir todavía: se abre sin ellas antes que no abrirla
-    i = post({"title": titulo, "body": cuerpo})
-print(f"  + {repo}#{i['number']}  {titulo}")
+
+def parse_blocks(text):
+    records = []
+    for number, block in enumerate(re.split(r"(?m)^---[ \t]*$", text), 1):
+        if not block.strip():
+            continue
+        fields = {}
+        body = []
+        in_body = False
+        for line in block.splitlines():
+            if in_body:
+                body.append(line[2:] if line.startswith("  ") else line)
+            elif line.startswith("cuerpo: |"):
+                in_body = True
+            else:
+                match = re.match(r"^(repo|titulo|etiquetas):[ \t]*(.*)$", line)
+                if match:
+                    fields[match[1]] = match[2].strip()
+                elif line.strip() and not line.lstrip().startswith("#"):
+                    raise ValueError(f"bloque {number}: línea no reconocida")
+        if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", fields.get("repo", "")):
+            raise ValueError(f"bloque {number}: repo inválido o ausente")
+        if not fields.get("titulo"):
+            raise ValueError(f"bloque {number}: falta titulo")
+        fields["body"] = "\n".join(body).strip()
+        fields["labels"] = [x.strip() for x in fields.get("etiquetas", "").split(",") if x.strip()]
+        records.append(fields)
+    return records
+
+
+def request(token, path, data=None):
+    req = urllib.request.Request(
+        "https://api.github.com/" + path,
+        data=None if data is None else json.dumps(data).encode(),
+        headers={"Authorization": "Bearer " + token,
+                 "Accept": "application/vnd.github+json", "User-Agent": "incidencias"},
+    )
+    with urllib.request.urlopen(req, timeout=30) as response:
+        return json.load(response)
+
+
+def main():
+    path = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "incidencias.txt")
+    records = parse_blocks(path.read_text(encoding="utf-8"))
+    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if not token:
+        token = (pathlib.Path.home() / ".gh-tokens").read_text().splitlines()[0].strip()
+    if not token:
+        raise ValueError("falta token de GitHub")
+    opened = 0
+    known = {}
+    for item in records:
+        repo = item["repo"]
+        if repo not in known:
+            titles = set()
+            page = 1
+            while True:
+                issues = request(token, f"repos/{repo}/issues?state=open&per_page=100&page={page}")
+                if not isinstance(issues, list):
+                    raise ValueError("respuesta de incidencias inválida")
+                titles.update(i["title"] for i in issues if "pull_request" not in i)
+                if len(issues) < 100:
+                    break
+                page += 1
+            known[repo] = titles
+        if item["titulo"] in known[repo]:
+            print("  = ya existe:", item["titulo"])
+            continue
+        payload = {"title": item["titulo"], "body": item["body"]}
+        if item["labels"]:
+            payload["labels"] = item["labels"]
+        # Un error HTTP aborta: jamás se interpreta como lista vacía ni éxito.
+        issue = request(token, f"repos/{repo}/issues", payload)
+        known[repo].add(item["titulo"])
+        opened += 1
+        print(f"  + {repo}#{issue['number']}  {item['titulo']}")
+    print(f"{opened} incidencias abiertas")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except (OSError, ValueError, urllib.error.URLError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(1)
 PY
-  abiertas=$((abiertas+1))
-  rm -f "$bloque"
-done
-echo "$abiertas incidencias abiertas"

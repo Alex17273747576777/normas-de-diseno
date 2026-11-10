@@ -14,6 +14,16 @@ set -euo pipefail
 
 VERSION="${1:?falta la versión, p. ej. 1.9.1}"
 TITULO="${2:?falta el título de la release}"
+NOTAS="${NOTAS_RELEASE:-/tmp/notas-$VERSION.md}"
+# Fallar ANTES de compilar, modificar la versión o publicar commits.
+python3 - "$NOTAS" <<'PY'
+import pathlib, sys
+p = pathlib.Path(sys.argv[1])
+if not p.is_file():
+    raise SystemExit(f"falta {p}: escribe la nota de esta versión antes de cerrar")
+if len(p.read_text(encoding="utf-8").strip()) < 80:
+    raise SystemExit(f"{p} es demasiado corta para contar lo que cambió")
+PY
 RAIZ="$(pwd)"
 TOKEN="$(head -1 "$HOME/.gh-tokens")"
 REPO="$(git remote get-url origin | sed -E 's#.*github.com[:/]([^/]+/[^/.]+)(\.git)?#\1#')"
@@ -91,14 +101,14 @@ git push "https://Alex17273747576777:$TOKEN@github.com/$REPO.git" HEAD:main
 
 # 7. Release con sus cuatro adjuntos.
 paso "Release v$VERSION"
-RID=$(python3 - "$TOKEN" "$VERSION" "$TITULO" "$REPO" <<'PY'
+RID=$(python3 - "$TOKEN" "$VERSION" "$TITULO" "$REPO" "$NOTAS" <<'PY'
 import json, sys, urllib.request
 tok, ver, titulo, repo = sys.argv[1:5]
 # El cuerpo de la release se toma del archivo del tramo, NO de un /tmp que sobreviva de la vez
 # anterior. Pasó de verdad y durante cinco versiones: 1.9.9, 1.10.0, 1.11.0 y 1.12.0 se publicaron
 # con la misma nota, la de 1.9.9, porque el archivo de /tmp seguía ahí. Una nota repetida es una
 # mentira: dice que no cambió nada cuando cambió todo.
-nota = "/tmp/notas-$ver.md"
+nota = sys.argv[5]
 if not __import__("os").path.exists(nota):
     raise SystemExit(f"falta {nota}: la nota del tramo se escribe antes de cerrar, no se hereda")
 cuerpo = open(nota).read()
@@ -111,7 +121,7 @@ print(json.load(urllib.request.urlopen(r))["id"])
 PY
 )
 for f in "GLTools-Reborn-$VERSION.apk" "GLTools-Reborn-$VERSION-sin-comprimir.apk" "SHA256SUMS.txt" "MD5SUMS.txt"; do
-  curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/octet-stream" \
+  curl --fail-with-body --silent --show-error -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/octet-stream" \
     --data-binary "@$HOME/appteka/$f" \
     "https://uploads.github.com/repos/$REPO/releases/$RID/assets?name=$f" > /dev/null
   echo "  adjuntado $f"
@@ -119,13 +129,13 @@ done
 
 # 8. Comprobación anónima: como lo verá cualquiera que entre sin sesión.
 paso "Comprobación anónima de la release"
-curl -sL -o /tmp/descarga.apk "https://github.com/$REPO/releases/download/v$VERSION/GLTools-Reborn-$VERSION.apk"
+curl --fail --silent --show-error -L -o /tmp/descarga.apk "https://github.com/$REPO/releases/download/v$VERSION/GLTools-Reborn-$VERSION.apk"
 [ "$(sha256sum /tmp/descarga.apk | cut -d' ' -f1)" = "$SHA_N" ] || { echo "¡el SHA no coincide con lo subido!"; exit 1; }
 echo "  SHA-256 coincide · $NORMAL B normal · $CRUDO B crudo"
 
 # 9. Limpieza obligatoria del entorno local.
 paso "Limpieza"
-rm -f /tmp/notas-*.md /tmp/cuerpo-release.md
+rm -f -- "$NOTAS"
 rm -rf /tmp/apk-"$VERSION"*.apk /tmp/descarga.apk /tmp/estudio /tmp/proy /tmp/fuentes
 echo "  temporales fuera"
 
