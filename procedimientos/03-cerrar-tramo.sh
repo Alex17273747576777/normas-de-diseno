@@ -94,7 +94,16 @@ paso "Release v$VERSION"
 RID=$(python3 - "$TOKEN" "$VERSION" "$TITULO" "$REPO" <<'PY'
 import json, sys, urllib.request
 tok, ver, titulo, repo = sys.argv[1:5]
-cuerpo = open("/tmp/cuerpo-release.md").read() if __import__("os").path.exists("/tmp/cuerpo-release.md") else titulo
+# El cuerpo de la release se toma del archivo del tramo, NO de un /tmp que sobreviva de la vez
+# anterior. Pasó de verdad y durante cinco versiones: 1.9.9, 1.10.0, 1.11.0 y 1.12.0 se publicaron
+# con la misma nota, la de 1.9.9, porque el archivo de /tmp seguía ahí. Una nota repetida es una
+# mentira: dice que no cambió nada cuando cambió todo.
+nota = "/tmp/notas-$ver.md"
+if not __import__("os").path.exists(nota):
+    raise SystemExit(f"falta {nota}: la nota del tramo se escribe antes de cerrar, no se hereda")
+cuerpo = open(nota).read()
+if len(cuerpo.strip()) < 80:
+    raise SystemExit(f"{nota} es demasiado corta para contar lo que cambió")
 datos = json.dumps({"tag_name": f"v{ver}", "name": f"GLTools Reborn {ver}", "body": cuerpo}).encode()
 r = urllib.request.Request(f"https://api.github.com/repos/{repo}/releases", data=datos, method="POST",
     headers={"Authorization": "Bearer " + tok, "Accept": "application/vnd.github+json", "User-Agent": "cierre"})
@@ -116,6 +125,7 @@ echo "  SHA-256 coincide · $NORMAL B normal · $CRUDO B crudo"
 
 # 9. Limpieza obligatoria del entorno local.
 paso "Limpieza"
+rm -f /tmp/notas-*.md /tmp/cuerpo-release.md
 rm -rf /tmp/apk-"$VERSION"*.apk /tmp/descarga.apk /tmp/estudio /tmp/proy /tmp/fuentes
 echo "  temporales fuera"
 
