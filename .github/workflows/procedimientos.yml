@@ -11,3 +11,9 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m unittest discover -s tests -v
+      - name: Auditar las reglas (numeración, vigías y sincronía)
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin main || true
+          # En el CI no hay repositorio del producto: se exige todo lo demás.
+          ./procedimientos/06-auditar-reglas.sh
