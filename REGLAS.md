@@ -64,6 +64,24 @@ Cuando el diseño propio no esté a la altura:
 | **iOS 26 / Liquid Glass** | Superficies que flotan sobre contenido, no cajas sobre fondo |
 | **GLTools original** | Estructura de pantallas: Home con estado arriba, tiles grandes, configuración por pestañas en mayúsculas |
 
+## Aprender de las apps que ya existen (1.9.0)
+
+Antes de inventar una pantalla, **mirar cómo la resolvieron otros**. No de memoria ni de
+impresiones: descargar el APK, desmontarlo con `aapt2` y `jadx`, mirar sus capturas.
+
+Qué se copia y qué no:
+
+| Se copia | No se copia |
+|---|---|
+| La estructura: cómo ordena la información | Iconos, fuentes, ilustraciones |
+| El patrón de interacción que resuelve el problema | Colores y marca ajena |
+| La jerarquía: qué es lo primero que se lee | El tema por defecto de su framework |
+
+Un patrón que merece la pena tener a mano: **el carrusel de píldoras**. Cuando hay más de
+cuatro grupos de datos y no caben a la vez, una fila de píldoras que se desplaza con una
+encendida —y un solo panel debajo que cambia— resuelve el problema sin una lista que se
+desplaza sin fin. Es de *Hardware Monitor* y está en GLTools Reborn desde la 1.9.0.
+
 ## Cómo se comprueba (no es retórica)
 
 La regla está **vigilada por pruebas automáticas** (bloques «ley de diseño» y «sin disfraz de
