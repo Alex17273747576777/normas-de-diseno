@@ -16,6 +16,8 @@ una habilidad dice «haz una tarjeta con degradado», la norma manda y la habili
 | [`datos-reales-sin-relleno/`](datos-reales-sin-relleno/SKILL.md) | Conseguir datos legítimos y meterlos en el APK. |
 | [`honestidad-tecnica/`](honestidad-tecnica/SKILL.md) | Decir lo que está probado y lo que no. Transversal. |
 | [`limpieza-y-cierre/`](limpieza-y-cierre/SKILL.md) | Cerrar un tramo sin dejar basura ni cabos sueltos. |
+| [`kit-base/`](kit-base/SKILL.md) | El código de partida: paleta y superficies ya conformes a las normas. |
+| [`sistema-de-superficie.md`](sistema-de-superficie.md) | La paleta en cinco decisiones y por qué cada una. |
 
 ## Formato de una habilidad
 
@@ -31,4 +33,15 @@ description: una línea, qué hace y cuándo usarla
 ## Reglas que no se rompen
 ## Errores ya cometidos (no repetir)
 ## Cómo se comprueba que se hizo bien
+```
+
+## Cómo se comprueba que el índice no miente
+
+El índice se comprueba solo: `tests/test_habilidades.py` recorre esta tabla, abre cada ruta
+enlazada y falla si un enlace no existe, si hay una carpeta de habilidad que no está en la tabla,
+o si un `SKILL.md` no empieza por su cabecera `---`. Un índice que promete habilidades que no
+están es peor que no tener índice.
+
+```bash
+python3 -m unittest discover -s tests -v
 ```
