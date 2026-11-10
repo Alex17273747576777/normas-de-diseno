@@ -160,10 +160,21 @@ curl --fail --silent --show-error -L -o /tmp/descarga.apk "https://github.com/$R
 echo "  SHA-256 coincide · $NORMAL B normal · $CRUDO B crudo"
 
 # 9. Limpieza obligatoria del entorno local.
+#
+# La regla 11 dice que en el espacio de trabajo sólo viven credenciales. Antes esto sólo borraba
+# los temporales de /tmp y dejaba 48 MB de capturas, APK y clones en $HOME durante tres tramos.
 paso "Limpieza"
 rm -f -- "$NOTAS"
 rm -rf /tmp/apk-"$VERSION"*.apk /tmp/descarga.apk /tmp/estudio /tmp/proy /tmp/fuentes
+rm -rf "$HOME/uploads" "$HOME/appteka" "$HOME/trabajo" "$HOME/.gradle" "$HOME/.android" "$HOME/.kotlin"
 echo "  temporales fuera"
+# Nada que no sea credencial en la raíz del espacio de trabajo.
+BASURA=$(find "$HOME" -maxdepth 1 \( -name "uploads" -o -name "*.apk" -o -name "*.png" \
+  -o -name "*.jpg" -o -name "*.zip" \) 2>/dev/null | wc -l)
+if [ "$BASURA" -gt 0 ]; then
+  echo "  ¡quedan $BASURA cosas que no son credenciales en el espacio de trabajo (regla 11)!"; exit 1
+fi
+echo "  espacio de trabajo limpio: sólo credenciales"
 
 printf '\n\033[1m▸ TRAMO %s CERRADO\033[0m\n' "$VERSION"
 printf '  normal  %s  %s\n' "$NORMAL" "$SHA_N"
