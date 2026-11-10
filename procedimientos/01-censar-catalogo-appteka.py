@@ -20,6 +20,8 @@ CABECERAS = {"User-Agent": "Mozilla/5.0 (censo; 1 petición cada 300 ms)"}
 PAUSA = 0.3          # cortés: no se bombardea el servidor de nadie
 PAGINA = 96          # lo que devuelve la API por página
 
+FALLOS: list = []    # llamadas que no respondieron: el censo las cuenta, no las esconde
+
 
 def pedir(params: dict) -> dict:
     """Una llamada a la API, con reintentos. Devuelve el bloque `result`."""
@@ -30,8 +32,12 @@ def pedir(params: dict) -> dict:
             req = urllib.request.Request(url, headers=CABECERAS)
             with urllib.request.urlopen(req, timeout=30) as r:
                 return json.load(r)["result"]
-        except Exception:
+        except Exception as e:
+            ultimo = e
             time.sleep(1.5 * (intento + 1))
+    # Cuatro intentos fallidos NO son «categoría vacía». Antes se devolvía la lista vacía sin decir
+    # nada y el censo salía con menos apps de las que hay, con cara de estar completo.
+    FALLOS.append(f"{url} → {type(ultimo).__name__}: {ultimo}")
     return {"entries": [], "total": 0}
 
 
@@ -114,8 +120,16 @@ def main() -> None:
         "", "| Categoría | Apps |", "|---|---|",
     ]
     lineas += [f"| {n} | {c['total']} |" for n, c in sorted(censo.items(), key=lambda kv: -kv[1]["total"])]
+    if FALLOS:
+        lineas += ["", f"> **Censo incompleto:** {len(FALLOS)} llamadas a la API no respondieron. "
+                       "Los totales de arriba son un mínimo, no el número real."]
     open("resumen.md", "w").write("\n".join(lineas) + "\n")
     print(f"\nTOTAL {total} apps · {con_repo} con repositorio · escrito censo.json y resumen.md")
+    if FALLOS:
+        print(f"\n¡CENSO INCOMPLETO! {len(FALLOS)} llamadas sin respuesta:", file=sys.stderr)
+        for f in FALLOS[:10]:
+            print("  " + f, file=sys.stderr)
+        sys.exit(2)
 
 
 if __name__ == "__main__":
