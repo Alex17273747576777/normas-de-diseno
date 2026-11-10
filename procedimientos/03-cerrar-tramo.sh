@@ -29,8 +29,16 @@ paso() { printf '\n\033[1m▸ %s\033[0m\n' "$*"; }
 
 # 1. La versión, en los tres sitios donde vive. Si no coinciden, el APK miente.
 paso "Versión $VERSION en build.gradle, MainActivity y RegistroFallos"
-CODE=$(( $(grep -oP 'versionCode \K\d+' app/build.gradle) + 1 ))
-sed -i "s/versionCode [0-9]*/versionCode $CODE/; s/versionName \"[^\"]*\"/versionName \"$VERSION\"/" app/build.gradle
+# Idempotente: si ya está en esa versión, no se sube el código otra vez. Un script que no se
+# puede correr dos veces es un script que se rompe la segunda vez que se usa.
+ACTUAL=$(grep -oP 'versionName "\K[^"]*' app/build.gradle)
+if [ "$ACTUAL" = "$VERSION" ]; then
+  CODE=$(grep -oP 'versionCode \K\d+' app/build.gradle)
+else
+  CODE=$(( $(grep -oP 'versionCode \K\d+' app/build.gradle) + 1 ))
+  sed -i "s/versionCode [0-9]*/versionCode $CODE/" app/build.gradle
+fi
+sed -i "s/versionName \"[^\"]*\"/versionName \"$VERSION\"/" app/build.gradle
 sed -i "s/version = \"[0-9.]*\"/version = \"$VERSION\"/" \
   app/src/main/java/io/github/labandita/glreborn/MainActivity.kt
 sed -i "s/VERSION_REBORN = \"[0-9.]*\"/VERSION_REBORN = \"$VERSION\"/" \
@@ -52,8 +60,13 @@ cp app/build/outputs/apk/release/app-release.apk "/tmp/apk-$VERSION-crudo.apk"
 # 4. Verificar de verdad: firma, versión y que el código nuevo esté DENTRO del dex.
 paso "Verificación del artefacto"
 "$BT/apksigner" verify "/tmp/apk-$VERSION.apk"
-"$BT/aapt2" dump badging "/tmp/apk-$VERSION.apk" | head -1 | grep -q "versionName='$VERSION'" \
-  || { echo "¡la versión del APK no es $VERSION!"; exit 1; }
+# `head -1` con `pipefail` da SIGPIPE y el pipeline devuelve fallo aunque haya casado:
+# por eso aquí se usa `sed -n 1p`, que lee hasta el final. (Fallo encontrado al ejecutarlo.)
+LINEA=$("$BT/aapt2" dump badging "/tmp/apk-$VERSION.apk" 2>/dev/null | sed -n '1p')
+case "$LINEA" in
+  *"versionName='$VERSION'"*) echo "  versión del APK: $VERSION" ;;
+  *) echo "¡la versión del APK no es $VERSION! → $LINEA"; exit 1 ;;
+esac
 NORMAL=$(stat -c%s "/tmp/apk-$VERSION.apk"); CRUDO=$(stat -c%s "/tmp/apk-$VERSION-crudo.apk")
 [ "$CRUDO" -gt $((NORMAL * 3)) ] || { echo "el APK crudo no es 3× el normal: el empaquetado falló"; exit 1; }
 SHA_N=$(sha256sum "/tmp/apk-$VERSION.apk" | cut -d' ' -f1)
@@ -64,8 +77,10 @@ paso "Kit de publicación en ~/appteka/"
 mkdir -p "$HOME/appteka"
 cp "/tmp/apk-$VERSION.apk" "$HOME/appteka/GLTools-Reborn-$VERSION.apk"
 cp "/tmp/apk-$VERSION-crudo.apk" "$HOME/appteka/GLTools-Reborn-$VERSION-sin-comprimir.apk"
-rm -f "$HOME"/appteka/GLTools-Reborn-*.apk
-(cd "$HOME/appteka" && sha256sum GLTools-Reborn-"$VERSION"*.apk > SHA256SUMS.txt && md5sum GLTools-Reborn-"$VERSION"*.apk > MD5SUMS.txt)
+# Fuera los APK de versiones anteriores ANTES de calcular sumas: si no, las sumas apuntan a
+# ficheros que ya no existen. (Otro fallo encontrado ejecutándolo, no leyéndolo.)
+find "$HOME/appteka" -maxdepth 1 -name 'GLTools-Reborn-*.apk' ! -name "*-$VERSION*.apk" -delete
+(cd "$HOME/appteka" && sha256sum GLTools-Reborn-"$VERSION"*.apk > SHA256SUMS.txt && md5sum GLTools-Reborn-"$VERSION"*.apk > MD5SUMS.txt && cat SHA256SUMS.txt)
 
 # 6. Commit y push.
 paso "Commit y push"
