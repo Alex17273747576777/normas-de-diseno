@@ -17,6 +17,7 @@ una habilidad dice «haz una tarjeta con degradado», la norma manda y la habili
 | [`honestidad-tecnica/`](honestidad-tecnica/SKILL.md) | Decir lo que está probado y lo que no. Transversal. |
 | [`limpieza-y-cierre/`](limpieza-y-cierre/SKILL.md) | Cerrar un tramo sin dejar basura ni cabos sueltos. |
 | [`kit-base/`](kit-base/SKILL.md) | El código de partida: paleta y superficies ya conformes a las normas. |
+| [`estudio-y-documentacion/`](estudio-y-documentacion/SKILL.md) | Estudiar documentación ajena sin copiar de más: licencias, procedencia, y cómo un texto se convierte en una decisión. |
 | [`sistema-de-superficie.md`](sistema-de-superficie.md) | La paleta en cinco decisiones y por qué cada una. |
 
 ## Formato de una habilidad
