@@ -1,0 +1,5 @@
+*.pyc
+/censo.json
+/resumen.md
+__pycache__/
+censo/diff-*.md

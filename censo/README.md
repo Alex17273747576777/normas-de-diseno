@@ -91,8 +91,14 @@ comparara categoría a categoría contaría una reclasificación como «una app 
 `censo/censo-2026-11-17.json.gz` — recorrido completo de las 42 categorías, código de salida 0
 (el script sale 2 cuando falta alguna página, así que 0 significa que no se inventó nada).
 
-- 37.284 listados (categoría, app) que son **10.026 paquetes distintos** · media 3,72 · máximo 352
-- `app.morphe.manager` sigue siendo el que más se repite
+- 37.284 listados (categoría, app) que son **10.026 paquetes distintos** · media 3,72 · máximo **361**
+- `app.morphe.manager` 361× · `com.leadaxe.lxbox` 183× · `com.nebula.karing` 165× · `sh.haven.app` 153×
+- 5.961 apps salen en una sola categoría; 1.000 salen en más de siete
+
+**Corrección del mismo día:** este README decía «máximo 352», que es la cifra del snapshot del
+08-11 copiada en vez de medida. El 17-11 el máximo es 361 (`app.morphe.manager`). Se corrige
+aquí y se deja constancia porque un número copiado de la foto anterior es justamente el fallo
+que estos censos existen para evitar.
 - Diff contra el 08-11: **+58 paquetes**, +744 listados, 64 altas, 6 bajas, 8 mudanzas de
   categoría y 76 apps con datos cambiados (62 versiones, 33 autores, 9 fuentes, 5 nombres)
 
