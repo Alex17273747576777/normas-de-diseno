@@ -85,3 +85,24 @@ era la lectura del titular. Desde hoy `07-diff-de-censos.py` informa las dos cif
 distintas y listados— para que el error no se pueda repetir, y el diff identifica las apps por
 paquete en todo el censo, no por (categoría, id): con 26.572 entradas repetidas, un diff que
 comparara categoría a categoría contaría una reclasificación como «una app nueva y una retirada».
+
+## Snapshot 2026-11-17
+
+`censo/censo-2026-11-17.json.gz` — recorrido completo de las 42 categorías, código de salida 0
+(el script sale 2 cuando falta alguna página, así que 0 significa que no se inventó nada).
+
+- 37.284 listados (categoría, app) que son **10.026 paquetes distintos** · media 3,72 · máximo 352
+- `app.morphe.manager` sigue siendo el que más se repite
+- Diff contra el 08-11: **+58 paquetes**, +744 listados, 64 altas, 6 bajas, 8 mudanzas de
+  categoría y 76 apps con datos cambiados (62 versiones, 33 autores, 9 fuentes, 5 nombres)
+
+El diff está generado, no copiado a mano:
+
+```bash
+python3 procedimientos/07-diff-de-censos.py            # los dos últimos censos del directorio
+python3 procedimientos/07-diff-de-censos.py --markdown --max 40 > informes/2026-11-17-diff-censos-08-a-17.md
+```
+
+Lo que el diff **no** cuenta como cambio: `tamano` y `descargas` son ruido de contador y van en
+una línea aparte (63 y 3.859 apps respectivamente en estos nueve días). Si se mezclaran con las
+versiones, el informe diría que cambió casi todo y no serviría para nada.
